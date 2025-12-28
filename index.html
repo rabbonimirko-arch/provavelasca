@@ -1,417 +1,400 @@
 <!DOCTYPE html>
 <html lang="it">
-  <head>
-    <meta charset="UTF-8" />
-    <title>La Sciampista · Assistente AI</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      html, body {
-        margin: 0; padding: 0;
-        height: 100%; width: 100%;
-        background: #f7efe9; color: #1f1f1f;
-        font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-        -webkit-font-smoothing: antialiased;
-      }
-      body { display: flex; flex-direction: column; overflow: hidden; }
+<head>
+  <meta charset="UTF-8" />
+  <title>La Sciampista · Totem AI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%; width: 100%;
+      background: #000;
+      font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    }
 
-      header {
-        padding: 10px 14px;
-        font-size: .8rem;
-        letter-spacing: .12em;
-        text-transform: uppercase;
-        color: #6a5b54;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: rgba(255,255,255,0.6);
-        backdrop-filter: blur(8px);
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        z-index: 1000;
-      }
-      header .brand { color: #b47a72; font-weight: 600; }
+    .stage {
+      height: 100%;
+      width: 100%;
+      display: grid;
+      place-items: center;
+      background: #000;
+    }
 
-      .app-wrapper {
-        position: relative;
-        flex: 1;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        overflow: hidden;
-      }
+    /* contenitore 9:16 */
+    .frame {
+      position: relative;
+      width: 100vw;
+      max-width: 540px;
+      aspect-ratio: 9/16;
+      background: #000;
+      overflow: hidden;
+    }
 
-      .frame-9-16 {
-        position: relative;
-        width: 100vw;
-        max-width: 540px;
-        aspect-ratio: 9/16;
-        overflow: hidden;
-        background: #000;
-      }
+    /* iframe HeyGen */
+    #heygen-wrap {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
 
-      #heygen-streaming-embed {
-        position: absolute !important;
-        inset: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        border: none !important;
-        border-radius: 0 !important;
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-      }
-      #heygen-streaming-embed.show {
-        opacity: 1;
-        visibility: visible;
-        pointer-events: auto;
-        transition: opacity .25s ease-out;
-      }
-      #heygen-streaming-container,
-      #heygen-streaming-container iframe {
-        width: 100% !important;
-        height: 100% !important;
-        border: 0 !important;
-      }
+    #heygen-container, #heygen-container iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
 
-      .hint-mobile {
-        position: absolute;
-        bottom: 10px;
-        left: 0;
-        right: 0;
-        text-align: center;
-        font-size: .75rem;
-        color: #fff;
-        background: rgba(0,0,0,0.35);
-        padding: 8px 10px;
-        border-radius: 12px;
-        margin: 0 10px;
-        z-index: 70;
-      }
-      .hint-mobile strong { font-weight: 700; }
+    /* schermata idle sopra l'iframe (IMPORTANTISSIMA per kiosk) */
+    #idleOverlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 12px;
+      padding: 18px;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,.25), rgba(0,0,0,.70));
+      color: #fff;
+      z-index: 50;
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto; /* consente tap per partire */
+      transition: opacity .2s ease-out;
+    }
 
-      .pill {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        z-index: 80;
-        font-size: .75rem;
-        color: #fff;
-        background: rgba(0,0,0,0.35);
-        padding: 6px 10px;
-        border-radius: 999px;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        user-select: none;
-      }
-      .dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        background: #888;
-        box-shadow: 0 0 0 2px rgba(255,255,255,0.12) inset;
-      }
-      .dot.on { background: #46d369; }
+    #idleOverlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
 
-      #presence-video, #presence-canvas {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        opacity: 0;
-        pointer-events: none;
-        left: -9999px;
-        top: -9999px;
-      }
-    </style>
-  </head>
+    .idleCard {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 18px;
+      padding: 14px 14px;
+      backdrop-filter: blur(10px);
+    }
 
-  <body>
-    <header>
-      <div class="brand">La Sciampista · AI</div>
-      <div class="hint">Consulente capelli naturale</div>
-    </header>
+    .idleTitle {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0 0 6px 0;
+      letter-spacing: .02em;
+    }
 
-    <div class="app-wrapper">
-      <div class="frame-9-16" id="frame">
-        <div class="pill" aria-live="polite">
-          <span class="dot" id="presenceDot"></span>
-          <span id="presenceText">In attesa di presenza…</span>
-        </div>
+    .idleText {
+      font-size: 13px;
+      opacity: .9;
+      margin: 0;
+      line-height: 1.3;
+    }
 
-        <div class="pill" style="top:44px" aria-live="polite">
-          <span id="debugText">init…</span>
-        </div>
+    .idleHint {
+      font-size: 12px;
+      opacity: .9;
+      margin-top: 10px;
+    }
 
-        <div class="hint-mobile" id="hintMobile">
-          <strong>Avvicinati</strong> e l’avatar si attiva automaticamente.<br/>
-          Al primo avvio potrebbe essere necessario <strong>toccare lo schermo</strong> per abilitare il microfono.
-        </div>
+    /* debug pills (solo per test; puoi nasconderle mettendo display:none) */
+    .pill {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 80;
+      font-size: 12px;
+      color: #fff;
+      background: rgba(0,0,0,0.45);
+      padding: 6px 10px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+    }
+    .pill.debug { top: 44px; }
+    .dot {
+      width: 10px; height: 10px; border-radius: 999px;
+      background: #888;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.12) inset;
+    }
+    .dot.on { background: #46d369; }
 
-        <video id="presence-video" playsinline muted></video>
-        <canvas id="presence-canvas"></canvas>
+    /* camera (hidden) */
+    #cam, #camCanvas {
+      position: absolute;
+      width: 1px; height: 1px;
+      opacity: 0;
+      left: -9999px; top: -9999px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="stage">
+    <div class="frame" id="frame">
+
+      <!-- HeyGen embed (sempre presente sotto) -->
+      <div id="heygen-wrap">
+        <div id="heygen-container"></div>
       </div>
+
+      <!-- Idle overlay sopra HeyGen: quando non c'è nessuno, copre tutto -->
+      <div id="idleOverlay">
+        <div class="idleCard">
+          <div class="idleTitle">La Sciampista · AI</div>
+          <p class="idleText">
+            Avvicinati davanti alla camera per iniziare la consulenza.<br>
+            (In modalità kiosk, il microfono può richiedere un tocco iniziale.)
+          </p>
+          <div class="idleHint">Tocca lo schermo per avviare subito.</div>
+        </div>
+      </div>
+
+      <!-- Debug -->
+      <div class="pill" aria-live="polite">
+        <span class="dot" id="dot"></span>
+        <span id="status">Idle</span>
+      </div>
+      <div class="pill debug" aria-live="polite">
+        <span id="debug">init…</span>
+      </div>
+
+      <video id="cam" playsinline muted></video>
+      <canvas id="camCanvas"></canvas>
     </div>
+  </div>
 
-    <script>
-      (function(){
-        const host="https://labs.heygen.com";
-        const url=host+"/guest/streaming-embed?share=eyJxdWFsaXR5IjoiaGlnaCIsImF2YXRhck5hbWUiOiJLYXR5YV9Qcm9mZXNzaW9uYWxMb29rX3B1%0D%0AYmxpYyIsInByZXZpZXdJbWciOiJodHRwczovL2ZpbGVzMi5oZXlnZW4uYWkvYXZhdGFyL3YzLzM0%0D%0AOGRkZjUwM2M2NTRiOWJiYmI4YmVhOWY5MjEwZWFkXzU1ODcwL3ByZXZpZXdfdGFyZ2V0LndlYnAi%0D%0ALCJuZWVkUmVtb3ZlQmFja2dyb3VuZCI6dHJ1ZSwia25vd2xlZGdlQmFzZUlkIjoiY2E3M2VmNmY2%0D%0AOTdhNGFhMTgzZGM1MzZkY2EyMDY3YmYiLCJ1c2VybmFtZSI6ImZiNDBjZGI1NjdlZjRjMTg5MDM4%0D%0ANDkwODI5YzIwZTZmIn0%3D&inIFrame=1";
+  <script>
+    (function(){
+      // =========================
+      // CONFIG KIOSK
+      // =========================
+      const host = "https://labs.heygen.com";
+      const embedUrl = host + "/guest/streaming-embed?share=eyJxdWFsaXR5IjoiaGlnaCIsImF2YXRhck5hbWUiOiJLYXR5YV9Qcm9mZXNzaW9uYWxMb29rX3B1%0D%0AYmxpYyIsInByZXZpZXdJbWciOiJodHRwczovL2ZpbGVzMi5oZXlnZW4uYWkvYXZhdGFyL3YzLzM0%0D%0AOGRkZjUwM2M2NTRiOWJiYmI4YmVhOWY5MjEwZWFkXzU1ODcwL3ByZXZpZXdfdGFyZ2V0LndlYnAi%0D%0ALCJuZWVkUmVtb3ZlQmFja2dyb3VuZCI6dHJ1ZSwia25vd2xlZGdlQmFzZUlkIjoiY2E3M2VmNmY2%0D%0AOTdhNGFhMTgzZGM1MzZkY2EyMDY3YmYiLCJ1c2VybmFtZSI6ImZiNDBjZGI1NjdlZjRjMTg5MDM4%0D%0ANDkwODI5YzIwZTZmIn0%3D&inIFrame=1";
 
-        const frame = document.getElementById("frame");
+      // Presence tuning (kiosk)
+      const FACE_SCAN_EVERY_MS = 250;   // più reattivo
+      const FACE_REQUIRED_HITS = 2;     // 2 scans consecutive
+      const ABSENCE_TIMEOUT_MS = 1200; // dopo 1.2s senza faccia torna idle
 
-        // ==== Embed ====
-        const wrapDiv=document.createElement("div");
-        wrapDiv.id="heygen-streaming-embed";
-        const container=document.createElement("div");
-        container.id="heygen-streaming-container";
+      // Reset HeyGen when user leaves
+      const RESET_IFRAME_ON_ABSENCE = true;
 
-        // iframe creator (serve per "reset sessione")
-        function createIframe(){
-          const ifr=document.createElement("iframe");
-          ifr.allowFullscreen=false;
-          ifr.title="La Sciampista AI";
-          ifr.role="dialog";
-          ifr.allow="microphone; camera; autoplay";
-          ifr.src=url;
-          return ifr;
-        }
+      // Motion fallback (se FaceDetector non c'è)
+      const SAMPLE_W = 240, SAMPLE_H = 180;
+      const DIFF_THRESHOLD = 6;
+      const MOTION_RATIO = 0.0035;
+      const MOTION_REQUIRED_HITS = 2;
 
-        let iframe = createIframe();
+      // =========================
+      // DOM
+      // =========================
+      const container = document.getElementById("heygen-container");
+      const idleOverlay = document.getElementById("idleOverlay");
+      const dot = document.getElementById("dot");
+      const statusEl = document.getElementById("status");
+      const debugEl = document.getElementById("debug");
+      const frame = document.getElementById("frame");
+      const videoEl = document.getElementById("cam");
+      const canvasEl = document.getElementById("camCanvas");
+      const ctx = canvasEl.getContext("2d", { willReadFrequently: true });
+
+      // =========================
+      // HeyGen iframe lifecycle
+      // =========================
+      function createIframe(){
+        const ifr = document.createElement("iframe");
+        ifr.allowFullscreen = false;
+        ifr.title = "La Sciampista AI";
+        ifr.role = "dialog";
+        ifr.allow = "microphone; camera; autoplay";
+        ifr.src = embedUrl;
+        return ifr;
+      }
+
+      let iframe = createIframe();
+      container.appendChild(iframe);
+
+      function resetHeyGen(){
+        try { container.removeChild(iframe); } catch(_){}
+        iframe = createIframe();
         container.appendChild(iframe);
-        wrapDiv.appendChild(container);
-        frame.appendChild(wrapDiv);
+      }
 
-        // ==== UI refs ====
-        const videoEl = document.getElementById("presence-video");
-        const canvasEl = document.getElementById("presence-canvas");
-        const ctx = canvasEl.getContext("2d", { willReadFrequently: true });
+      function tryStartHeyGen(){
+        try {
+          iframe.contentWindow.postMessage({ type: "streaming-embed", action: "show" }, host);
+          iframe.contentWindow.postMessage({ type: "streaming-embed", action: "start" }, host);
+          iframe.contentWindow.postMessage({ type: "streaming-embed", action: "open" }, host);
+        } catch(_){}
+        try {
+          iframe.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+        } catch(_){}
+      }
 
-        const presenceDot = document.getElementById("presenceDot");
-        const presenceText = document.getElementById("presenceText");
-        const hintMobile = document.getElementById("hintMobile");
-        const debugText = document.getElementById("debugText");
+      // =========================
+      // UI helpers
+      // =========================
+      function setActiveUI(active, reason){
+        dot.classList.toggle("on", active);
+        statusEl.textContent = active ? "Active" : "Idle";
+        if (debugEl) debugEl.textContent = reason || "";
+        if (active) idleOverlay.classList.add("hidden");
+        else idleOverlay.classList.remove("hidden");
+      }
 
-        function setPresenceUI(on){
-          presenceDot.classList.toggle("on", on);
-          presenceText.textContent = on ? "Presenza rilevata · Attivo chat…" : "In attesa di presenza…";
-        }
+      // Tap overlay: start anyway
+      idleOverlay.addEventListener("click", () => {
+        setActiveUI(true, "manual tap");
+        tryStartHeyGen();
+      }, { passive: true });
 
-        function showHeyGen(){
-          wrapDiv.classList.add("show");
-          hintMobile.style.display = "none";
-        }
+      // =========================
+      // Presence detection
+      // =========================
+      const faceSupported = ("FaceDetector" in window);
+      let faceDetector = null;
 
-        function hideHeyGen(){
-          wrapDiv.classList.remove("show");
-          hintMobile.style.display = "block";
-        }
+      let isActive = false;
+      let lastSeenTs = 0;
+      let hits = 0;
 
-        // ====== OPZIONE RESET SESSIONE ======
-        // Se true: quando la persona va via, ricarica l'iframe (sessione “pulita” per il prossimo)
-        const RESET_IFRAME_ON_ABSENCE = true;
+      // motion fallback state
+      let lastImageData = null;
+      let motionHits = 0;
 
-        function resetHeyGenSession(){
-          try {
-            container.removeChild(iframe);
-          } catch(_) {}
-          iframe = createIframe();
-          container.appendChild(iframe);
-        }
+      function setActive(reason){
+        isActive = true;
+        lastSeenTs = Date.now();
+        hits = 0;
+        motionHits = 0;
+        setActiveUI(true, "ACTIVE ✅ " + reason);
+        tryStartHeyGen();
+      }
 
-        function activateHeyGen(){
-          showHeyGen();
-          try {
-            iframe.contentWindow.postMessage({ type: "streaming-embed", action: "show" }, host);
-            iframe.contentWindow.postMessage({ type: "streaming-embed", action: "start" }, host);
-            iframe.contentWindow.postMessage({ type: "streaming-embed", action: "open" }, host);
-          } catch(_) {}
-          try {
-            iframe.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
-          } catch(_) {}
-        }
+      function setIdle(reason){
+        isActive = false;
+        hits = 0;
+        motionHits = 0;
+        setActiveUI(false, "IDLE 💤 " + reason);
+        if (RESET_IFRAME_ON_ABSENCE) resetHeyGen();
+      }
 
-        // Tap manuale = sblocca sempre
-        frame.addEventListener("click", () => showHeyGen(), { passive: true });
+      async function startCamera(){
+        try {
+          setActiveUI(false, "camera: request…");
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+            audio: false
+          });
+          videoEl.srcObject = stream;
+          await videoEl.play();
+          canvasEl.width = SAMPLE_W;
+          canvasEl.height = SAMPLE_H;
 
-        // ===============================
-        // FACE DETECTION + PRESENCE LOCK
-        // ===============================
-        const faceSupported = ("FaceDetector" in window);
-        let faceDetector = null;
-
-        // Stato presenza
-        let isActive = false;
-        let lastSeenTs = 0;
-        let faceConsecutiveHits = 0;
-
-        // Tuning (qui è dove abbiamo sistemato il tuo problema)
-        const FACE_SCAN_EVERY_MS = 300;
-        const FACE_REQUIRED_HITS = 2;
-
-        // <<<<< QUI: quanto tempo deve passare senza volto per tornare in attesa >>>>>
-        const ABSENCE_TIMEOUT_MS = 1500; // 1.5s (metti 1000 se lo vuoi ancora più rapido)
-
-        // ===============================
-        // MOTION fallback (se FaceDetector manca)
-        // ===============================
-        let lastImageData = null;
-        let motionConsecutiveHits = 0;
-
-        const SAMPLE_W = 240;
-        const SAMPLE_H = 180;
-        const DIFF_THRESHOLD = 6;
-        const MOTION_RATIO = 0.0035;
-        const MOTION_REQUIRED_HITS = 2;
-
-        function setActive(reason){
-          isActive = true;
-          lastSeenTs = Date.now();
-          setPresenceUI(true);
-          activateHeyGen();
-          if (debugText) debugText.textContent = `ACTIVE ✅ (${reason})`;
-        }
-
-        function setIdle(reason){
-          isActive = false;
-          faceConsecutiveHits = 0;
-          motionConsecutiveHits = 0;
-          setPresenceUI(false);
-          hideHeyGen();
-
-          if (RESET_IFRAME_ON_ABSENCE) {
-            resetHeyGenSession();
+          if (faceSupported) {
+            faceDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+            setActiveUI(false, "FaceDetector: ON");
+          } else {
+            setActiveUI(false, "FaceDetector: OFF (motion fallback)");
           }
 
-          if (debugText) debugText.textContent = `IDLE 💤 (${reason})`;
+          tick();
+        } catch (e) {
+          setActiveUI(true, "camera denied → manual only");
+          idleOverlay.querySelector(".idleText").innerHTML =
+            "Permesso camera/microfono negato.<br/>Tocca lo schermo per avviare comunque.";
         }
+      }
 
-        async function startCamera(){
-          try {
-            if (debugText) debugText.textContent = "camera: richiesta permesso…";
+      let lastScanTs = 0;
 
-            const stream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-              audio: false
-            });
+      async function tick(){
+        const now = Date.now();
 
-            videoEl.srcObject = stream;
-            await videoEl.play();
+        // ACTIVE: controlla se assente
+        if (isActive) {
+          const saw = await detectPresenceOnce();
+          if (saw) lastSeenTs = now;
 
-            canvasEl.width = SAMPLE_W;
-            canvasEl.height = SAMPLE_H;
-
-            if (faceSupported) {
-              faceDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-              if (debugText) debugText.textContent = "FaceDetector: ON";
-            } else {
-              if (debugText) debugText.textContent = "FaceDetector: OFF (fallback motion)";
-            }
-
-            tick();
-
-          } catch (err) {
-            setPresenceUI(false);
-            presenceText.textContent = "Camera non disponibile · Tocca per avviare";
-            if (debugText) debugText.textContent = "camera: ERRORE/NEGATA";
-            showHeyGen();
-          }
-        }
-
-        let lastScanTs = 0;
-
-        async function tick(){
-          const now = Date.now();
-
-          // Se siamo ACTIVE: controlliamo solo se è sparito il volto da troppo
-          if (isActive) {
-            // Aggiorna lastSeenTs se vede ancora la faccia (o motion in fallback)
-            const saw = await detectPresenceOnce(now);
-
-            if (saw) lastSeenTs = now;
-
-            const absentFor = now - lastSeenTs;
-            if (absentFor >= ABSENCE_TIMEOUT_MS) {
-              setIdle("assenza");
-            } else {
-              if (debugText) debugText.textContent = `ACTIVE (absent ${absentFor}ms)`;
-            }
-
-            requestAnimationFrame(tick);
-            return;
-          }
-
-          // Se NON active: cerchiamo di attivare
-          if ((now - lastScanTs) >= FACE_SCAN_EVERY_MS) {
-            lastScanTs = now;
-
-            const saw = await detectPresenceOnce(now);
-
-            if (saw) {
-              faceConsecutiveHits++;
-              if (debugText) debugText.textContent = `Detect: ✅ (${faceConsecutiveHits}/${FACE_REQUIRED_HITS})`;
-              if (faceConsecutiveHits >= FACE_REQUIRED_HITS) setActive(faceSupported ? "face" : "motion");
-            } else {
-              faceConsecutiveHits = Math.max(0, faceConsecutiveHits - 1);
-              if (debugText) debugText.textContent = `Detect: -- (${faceConsecutiveHits}/${FACE_REQUIRED_HITS})`;
-            }
+          const absentFor = now - lastSeenTs;
+          if (absentFor >= ABSENCE_TIMEOUT_MS) {
+            setIdle("assenza " + absentFor + "ms");
+          } else {
+            setActiveUI(true, "Active (absent " + absentFor + "ms)");
           }
 
           requestAnimationFrame(tick);
+          return;
         }
 
-        async function detectPresenceOnce(){
-          // Preferisci face detection
-          if (faceSupported && faceDetector) {
-            try {
-              const bmp = await createImageBitmap(videoEl);
-              const faces = await faceDetector.detect(bmp);
-              bmp.close?.();
-              return (faces && faces.length > 0);
-            } catch (e) {
-              // se FaceDetector fallisce, fallback motion
-              faceDetector = null;
-              if (debugText) debugText.textContent = "FaceDetector errore → fallback motion";
-              return detectMotionOnce();
-            }
-          }
+        // IDLE: rileva presenza
+        if ((now - lastScanTs) >= FACE_SCAN_EVERY_MS) {
+          lastScanTs = now;
 
-          // fallback motion
-          return detectMotionOnce();
+          const saw = await detectPresenceOnce();
+          if (saw) {
+            hits++;
+            setActiveUI(false, (faceSupported && faceDetector) ? `Face: ✅ (${hits}/${FACE_REQUIRED_HITS})` : `Motion: ✅ (${hits}/${FACE_REQUIRED_HITS})`);
+            if (hits >= FACE_REQUIRED_HITS) setActive((faceSupported && faceDetector) ? "face" : "motion");
+          } else {
+            hits = Math.max(0, hits - 1);
+            setActiveUI(false, (faceSupported && faceDetector) ? `Face: -- (${hits}/${FACE_REQUIRED_HITS})` : `Motion: -- (${hits}/${FACE_REQUIRED_HITS})`);
+          }
         }
 
-        function detectMotionOnce(){
-          if (videoEl.readyState < 2) return false;
+        requestAnimationFrame(tick);
+      }
 
-          ctx.drawImage(videoEl, 0, 0, SAMPLE_W, SAMPLE_H);
-          const imageData = ctx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
-
-          if (!lastImageData) {
-            lastImageData = imageData;
-            return false;
+      async function detectPresenceOnce(){
+        if (faceSupported && faceDetector) {
+          try {
+            const bmp = await createImageBitmap(videoEl);
+            const faces = await faceDetector.detect(bmp);
+            bmp.close?.();
+            return faces && faces.length > 0;
+          } catch (e) {
+            // fallback to motion if FaceDetector errors
+            faceDetector = null;
+            return detectMotionOnce();
           }
+        }
+        return detectMotionOnce();
+      }
 
-          let changed = 0;
-          const data = imageData.data;
-          const last = lastImageData.data;
+      function detectMotionOnce(){
+        if (videoEl.readyState < 2) return false;
 
-          for (let i = 0; i < data.length; i += 4) {
-            const r = data[i], g = data[i+1], b = data[i+2];
-            const lr = last[i], lg = last[i+1], lb = last[i+2];
-            const diff = (Math.abs(r-lr) + Math.abs(g-lg) + Math.abs(b-lb)) / 3;
-            if (diff > DIFF_THRESHOLD) changed++;
-          }
+        ctx.drawImage(videoEl, 0, 0, SAMPLE_W, SAMPLE_H);
+        const img = ctx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
 
-          const totalSamples = (data.length / 4);
-          const ratio = changed / totalSamples;
+        if (!lastImageData) { lastImageData = img; return false; }
 
-          lastImageData = imageData;
+        let changed = 0;
+        const data = img.data;
+        const last = lastImageData.data;
 
-          const saw = ratio > MOTION_RATIO;
-          if (debugText && !faceSupported) debugText.textContent = `Motion ratio: ${ratio.toFixed(4)}`;
-          return saw;
+        for (let i = 0; i < data.length; i += 4) {
+          const diff = (Math.abs(data[i]-last[i]) + Math.abs(data[i+1]-last[i+1]) + Math.abs(data[i+2]-last[i+2])) / 3;
+          if (diff > DIFF_THRESHOLD) changed++;
         }
 
-        window.addEventListener("load", startCamera);
-      })();
-    </script>
-  </body>
+        const ratio = changed / (data.length / 4);
+        lastImageData = img;
+
+        // per debug puoi vedere ratio
+        // debugEl.textContent = "Motion ratio: " + ratio.toFixed(4);
+
+        return ratio > MOTION_RATIO;
+      }
+
+      window.addEventListener("load", startCamera);
+    })();
+  </script>
+</body>
 </html>
