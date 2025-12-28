@@ -230,14 +230,14 @@
         let presenceActive = false;
         let consecutiveHits = 0;
 
-        // ===== PARAMETRI PIÙ SENSIBILI (MODIFICHE) =====
-        const SAMPLE_W = 160;
-        const SAMPLE_H = 120;
+        // ===== PARAMETRI ULTRA-SENSIBILI (MODIFICHE) =====
+        const SAMPLE_W = 240;        // prima 160
+        const SAMPLE_H = 180;        // prima 120
 
-        const DIFF_THRESHOLD = 10;     // più sensibile (prima 18)
-        const MOTION_RATIO   = 0.012;  // meno movimento richiesto (prima 0.035)
-        const REQUIRED_HITS  = 3;      // meno frame consecutivi (prima 6)
-        const COOLDOWN_MS    = 6000;   // cooldown più corto (prima 12000)
+        const DIFF_THRESHOLD = 6;    // prima 10 (più sensibile)
+        const MOTION_RATIO   = 0.0035; // prima 0.012 (trigger anche con motion bassissima)
+        const REQUIRED_HITS  = 2;    // prima 3
+        const COOLDOWN_MS    = 5000; // ok
 
         function setPresenceUI(on){
           presenceDot.classList.toggle("on", on);
@@ -286,12 +286,13 @@
             videoEl.srcObject = stream;
             await videoEl.play();
 
+            // IMPORTANT: canvas deve seguire le nuove dimensioni
             canvasEl.width = SAMPLE_W;
             canvasEl.height = SAMPLE_H;
 
             if (debugText) debugText.textContent = "motion: --- · camera: OK";
 
-            // ===== FALLBACK (MODIFICA): se non rileva entro 8s, mostra comunque =====
+            // Fallback: se non rileva entro 8s, mostra comunque
             setTimeout(() => {
               if (!wrapDiv.classList.contains("show")) {
                 presenceText.textContent = "Presenza non rilevata · Avvio manuale";
@@ -303,7 +304,6 @@
             requestAnimationFrame(loop);
 
           } catch (err) {
-            // Se camera negata/non disponibile: mostra avatar, ma avvisa
             setPresenceUI(false);
             presenceText.textContent = "Camera non disponibile · Tocca per avviare";
             if (debugText) debugText.textContent = "motion: --- · camera: ERRORE/NEGATA";
@@ -312,7 +312,6 @@
         }
 
         function loop(){
-          // Debug se non arrivano frame
           if (debugText && videoEl.readyState < 2) {
             debugText.textContent = "motion: --- · camera: attesa frame…";
           }
@@ -326,18 +325,18 @@
               const data = imageData.data;
               const last = lastImageData.data;
 
-              // campionamento veloce: 1 pixel ogni 2 (i+=8)
-              for (let i = 0; i < data.length; i += 8) {
+              // ===== campionamento più fitto (MODIFICA): i += 4 invece di 8 =====
+              for (let i = 0; i < data.length; i += 4) {
                 const r = data[i], g = data[i+1], b = data[i+2];
                 const lr = last[i], lg = last[i+1], lb = last[i+2];
                 const diff = (Math.abs(r-lr) + Math.abs(g-lg) + Math.abs(b-lb)) / 3;
                 if (diff > DIFF_THRESHOLD) changed++;
               }
 
-              const totalSamples = (data.length / 8);
+              const totalSamples = (data.length / 4);
               const ratio = changed / totalSamples;
 
-              if (debugText) debugText.textContent = `motion: ${ratio.toFixed(3)} · camera: OK`;
+              if (debugText) debugText.textContent = `motion: ${ratio.toFixed(4)} · camera: OK`;
 
               const now = Date.now();
               const inCooldown = (now - lastPresenceTs) < COOLDOWN_MS;
