@@ -5,7 +5,7 @@
     <title>La Sciampista · Assistente AI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-      html,body {
+      html, body {
         margin: 0;
         padding: 0;
         height: 100%;
@@ -118,7 +118,9 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
+        user-select: none;
       }
+
       .dot {
         width: 10px;
         height: 10px;
@@ -148,10 +150,15 @@
     </header>
 
     <div class="app-wrapper">
-      <div class="frame-9-16">
+      <div class="frame-9-16" id="frame">
         <div class="presence-pill" id="presencePill" aria-live="polite">
           <span class="dot" id="presenceDot"></span>
           <span id="presenceText">In attesa di presenza…</span>
+        </div>
+
+        <!-- DEBUG: mostra motion + stato camera -->
+        <div class="presence-pill" style="top:44px" id="debugPill" aria-live="polite">
+          <span id="debugText">motion: --- · camera: avvio…</span>
         </div>
 
         <div class="hint-mobile" id="hintMobile">
@@ -165,12 +172,14 @@
       </div>
     </div>
 
-    <!-- Script HeyGen a tutto schermo -->
     <script>
       (function(window){
         const host="https://labs.heygen.com";
         const url=host+"/guest/streaming-embed?share=eyJxdWFsaXR5IjoiaGlnaCIsImF2YXRhck5hbWUiOiJLYXR5YV9Qcm9mZXNzaW9uYWxMb29rX3B1%0D%0AYmxpYyIsInByZXZpZXdJbWciOiJodHRwczovL2ZpbGVzMi5oZXlnZW4uYWkvYXZhdGFyL3YzLzM0%0D%0AOGRkZjUwM2M2NTRiOWJiYmI4YmVhOWY5MjEwZWFkXzU1ODcwL3ByZXZpZXdfdGFyZ2V0LndlYnAi%0D%0ALCJuZWVkUmVtb3ZlQmFja2dyb3VuZCI6dHJ1ZSwia25vd2xlZGdlQmFzZUlkIjoiY2E3M2VmNmY2%0D%0AOTdhNGFhMTgzZGM1MzZkY2EyMDY3YmYiLCJ1c2VybmFtZSI6ImZiNDBjZGI1NjdlZjRjMTg5MDM4%0D%0ANDkwODI5YzIwZTZmIn0%3D&inIFrame=1";
 
+        const frame=document.getElementById("frame");
+
+        // Wrapper embed
         const wrapDiv=document.createElement("div");
         wrapDiv.id="heygen-streaming-embed";
 
@@ -190,15 +199,8 @@
             overflow: hidden;
             transition: opacity .25s ease-out;
           }
-          #heygen-streaming-container {
-            width: 100%;
-            height: 100%;
-          }
-          #heygen-streaming-container iframe {
-            width: 100%;
-            height: 100%;
-            border: 0;
-          }
+          #heygen-streaming-container { width: 100%; height: 100%; }
+          #heygen-streaming-container iframe { width: 100%; height: 100%; border: 0; }
         `;
 
         const iframe=document.createElement("iframe");
@@ -208,25 +210,12 @@
         iframe.allow="microphone; camera; autoplay";
         iframe.src=url;
 
-        let initial=false;
-        window.addEventListener("message",(e=>{
-          if(e.origin!==host) return;
-          if(!e.data || e.data.type!=="streaming-embed") return;
-
-          if(e.data.action==="init"){
-            initial=true;
-            // non mostro subito: lo gestiamo noi con la presenza
-          }
-        }));
-
         container.appendChild(iframe);
         wrapDiv.appendChild(stylesheet);
         wrapDiv.appendChild(container);
+        frame.appendChild(wrapDiv);
 
-        const frame=document.querySelector('.frame-9-16');
-        if(frame){ frame.appendChild(wrapDiv); }
-
-        // ===== Presence detection (motion) =====
+        // UI refs
         const videoEl = document.getElementById("presence-video");
         const canvasEl = document.getElementById("presence-canvas");
         const ctx = canvasEl.getContext("2d", { willReadFrequently: true });
@@ -234,64 +223,57 @@
         const presenceDot = document.getElementById("presenceDot");
         const presenceText = document.getElementById("presenceText");
         const hintMobile = document.getElementById("hintMobile");
+        const debugText = document.getElementById("debugText");
 
         let lastImageData = null;
         let lastPresenceTs = 0;
         let presenceActive = false;
         let consecutiveHits = 0;
 
-        // parametri (tarabili)
+        // ===== PARAMETRI PIÙ SENSIBILI (MODIFICHE) =====
         const SAMPLE_W = 160;
         const SAMPLE_H = 120;
-        const DIFF_THRESHOLD = 18;       // sensibilità pixel (0-255)
-        const MOTION_RATIO = 0.035;      // % pixel in movimento per "presenza"
-        const REQUIRED_HITS = 6;         // frame consecutivi per confermare presenza
-        const COOLDOWN_MS = 12000;       // dopo attivazione, non "rimbalza" per 12s
+
+        const DIFF_THRESHOLD = 10;     // più sensibile (prima 18)
+        const MOTION_RATIO   = 0.012;  // meno movimento richiesto (prima 0.035)
+        const REQUIRED_HITS  = 3;      // meno frame consecutivi (prima 6)
+        const COOLDOWN_MS    = 6000;   // cooldown più corto (prima 12000)
 
         function setPresenceUI(on){
           presenceDot.classList.toggle("on", on);
           presenceText.textContent = on ? "Presenza rilevata · Attivo chat…" : "In attesa di presenza…";
         }
 
+        function showHeyGen(){
+          wrapDiv.classList.add("show");
+          hintMobile.style.display = "none";
+        }
+
         function activateHeyGen(){
-          wrapDiv.classList.add("show");
-          hintMobile.style.display = "none";
+          showHeyGen();
 
-          // Tentativo 1: postMessage (funziona solo se HeyGen lo supporta)
+          // Tentativo postMessage (se supportato dall’embed)
           try {
-            iframe.contentWindow.postMessage(
-              { type: "streaming-embed", action: "show" },
-              host
-            );
-            // alcuni embed usano nomi diversi: proviamo anche "start"
-            iframe.contentWindow.postMessage(
-              { type: "streaming-embed", action: "start" },
-              host
-            );
-            iframe.contentWindow.postMessage(
-              { type: "streaming-embed", action: "open" },
-              host
-            );
+            iframe.contentWindow.postMessage({ type: "streaming-embed", action: "show" }, host);
+            iframe.contentWindow.postMessage({ type: "streaming-embed", action: "start" }, host);
+            iframe.contentWindow.postMessage({ type: "streaming-embed", action: "open" }, host);
           } catch(_) {}
 
-          // Tentativo 2: “tap” sintetico sull’iframe (non sempre accettato dal browser)
+          // Tentativo click sintetico sull’iframe (non sempre accettato)
           try {
-            const ev = new MouseEvent("click", { bubbles: true, cancelable: true, view: window });
-            iframe.dispatchEvent(ev);
+            iframe.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
           } catch(_) {}
         }
 
-        function deactivateHintIfNeeded(){
-          // se l’utente tocca manualmente, mostriamo comunque l’avatar
-          wrapDiv.classList.add("show");
-          hintMobile.style.display = "none";
-        }
-
-        // click/tap manuale: fallback perfetto per microfono
-        frame.addEventListener("click", deactivateHintIfNeeded, { passive: true });
+        // Fallback perfetto per microfono: tap/click manuale
+        frame.addEventListener("click", () => {
+          showHeyGen();
+        }, { passive: true });
 
         async function startCamera(){
           try {
+            if (debugText) debugText.textContent = "motion: --- · camera: richiesta permesso…";
+
             const stream = await navigator.mediaDevices.getUserMedia({
               video: {
                 facingMode: "user",
@@ -300,65 +282,83 @@
               },
               audio: false
             });
+
             videoEl.srcObject = stream;
             await videoEl.play();
 
             canvasEl.width = SAMPLE_W;
             canvasEl.height = SAMPLE_H;
 
+            if (debugText) debugText.textContent = "motion: --- · camera: OK";
+
+            // ===== FALLBACK (MODIFICA): se non rileva entro 8s, mostra comunque =====
+            setTimeout(() => {
+              if (!wrapDiv.classList.contains("show")) {
+                presenceText.textContent = "Presenza non rilevata · Avvio manuale";
+                if (debugText) debugText.textContent = "motion: --- · camera: OK (fallback)";
+                showHeyGen();
+              }
+            }, 8000);
+
             requestAnimationFrame(loop);
+
           } catch (err) {
-            // Se la camera non è disponibile o negata, lasciamo solo l’attivazione manuale
+            // Se camera negata/non disponibile: mostra avatar, ma avvisa
             setPresenceUI(false);
             presenceText.textContent = "Camera non disponibile · Tocca per avviare";
-            wrapDiv.classList.add("show");
-            // non nascondo hint: serve per guidare l’utente
+            if (debugText) debugText.textContent = "motion: --- · camera: ERRORE/NEGATA";
+            showHeyGen();
           }
         }
 
         function loop(){
-          if(videoEl.readyState >= 2){
+          // Debug se non arrivano frame
+          if (debugText && videoEl.readyState < 2) {
+            debugText.textContent = "motion: --- · camera: attesa frame…";
+          }
+
+          if (videoEl.readyState >= 2) {
             ctx.drawImage(videoEl, 0, 0, SAMPLE_W, SAMPLE_H);
             const imageData = ctx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
 
-            if(lastImageData){
+            if (lastImageData) {
               let changed = 0;
               const data = imageData.data;
               const last = lastImageData.data;
 
-              // confronto veloce: campiono un pixel ogni 2 (veloce + stabile)
-              for(let i=0; i<data.length; i+=8){
+              // campionamento veloce: 1 pixel ogni 2 (i+=8)
+              for (let i = 0; i < data.length; i += 8) {
                 const r = data[i], g = data[i+1], b = data[i+2];
                 const lr = last[i], lg = last[i+1], lb = last[i+2];
-
                 const diff = (Math.abs(r-lr) + Math.abs(g-lg) + Math.abs(b-lb)) / 3;
-                if(diff > DIFF_THRESHOLD) changed++;
+                if (diff > DIFF_THRESHOLD) changed++;
               }
 
               const totalSamples = (data.length / 8);
               const ratio = changed / totalSamples;
 
+              if (debugText) debugText.textContent = `motion: ${ratio.toFixed(3)} · camera: OK`;
+
               const now = Date.now();
               const inCooldown = (now - lastPresenceTs) < COOLDOWN_MS;
 
-              if(!inCooldown && ratio > MOTION_RATIO){
+              if (!inCooldown && ratio > MOTION_RATIO) {
                 consecutiveHits++;
               } else {
                 consecutiveHits = Math.max(0, consecutiveHits - 1);
               }
 
-              if(!presenceActive && !inCooldown && consecutiveHits >= REQUIRED_HITS){
+              if (!presenceActive && !inCooldown && consecutiveHits >= REQUIRED_HITS) {
                 presenceActive = true;
                 lastPresenceTs = now;
                 setPresenceUI(true);
                 activateHeyGen();
 
-                // dopo un po’ rimettiamo la UI in ascolto “soft”
-                setTimeout(()=>{
+                setTimeout(() => {
                   presenceActive = false;
                   setPresenceUI(false);
-                  // non nascondo l’avatar: una volta attivo lo lasciamo attivo
-                }, 4000);
+                  // l’avatar resta visibile
+                }, 2500);
               }
             }
 
@@ -368,9 +368,7 @@
           requestAnimationFrame(loop);
         }
 
-        // Avvia camera al load
         window.addEventListener("load", startCamera);
-
       })(globalThis);
     </script>
   </body>
