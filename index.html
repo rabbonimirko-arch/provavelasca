@@ -15,12 +15,7 @@
         font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
         -webkit-font-smoothing: antialiased;
       }
-
-      body {
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
+      body { display: flex; flex-direction: column; overflow: hidden; }
 
       header {
         padding: 10px 14px;
@@ -36,11 +31,7 @@
         border-bottom: 1px solid rgba(0,0,0,0.05);
         z-index: 1000;
       }
-
-      header .brand {
-        color: #b47a72;
-        font-weight: 600;
-      }
+      header .brand { color: #b47a72; font-weight: 600; }
 
       .app-wrapper {
         position: relative;
@@ -56,7 +47,6 @@
         width: 100vw;
         max-width: 540px;
         aspect-ratio: 9/16;
-        border-radius: 0;
         overflow: hidden;
         background: #000;
       }
@@ -68,19 +58,16 @@
         height: 100% !important;
         border: none !important;
         border-radius: 0 !important;
-        box-shadow: none !important;
         opacity: 0;
         visibility: hidden;
-        pointer-events: none; /* finché non c'è presenza */
+        pointer-events: none;
       }
-
       #heygen-streaming-embed.show {
         opacity: 1;
         visibility: visible;
         pointer-events: auto;
         transition: opacity .3s ease-out;
       }
-
       #heygen-streaming-container,
       #heygen-streaming-container iframe {
         width: 100% !important;
@@ -102,10 +89,9 @@
         margin: 0 10px;
         z-index: 50;
       }
-
       .hint-mobile strong { font-weight: 700; }
 
-      .presence-pill {
+      .pill {
         position: absolute;
         top: 10px;
         left: 10px;
@@ -120,7 +106,6 @@
         gap: 8px;
         user-select: none;
       }
-
       .dot {
         width: 10px;
         height: 10px;
@@ -130,7 +115,6 @@
       }
       .dot.on { background: #46d369; }
 
-      /* camera (nascosta) */
       #presence-video, #presence-canvas {
         position: absolute;
         width: 1px;
@@ -151,14 +135,13 @@
 
     <div class="app-wrapper">
       <div class="frame-9-16" id="frame">
-        <div class="presence-pill" id="presencePill" aria-live="polite">
+        <div class="pill" aria-live="polite">
           <span class="dot" id="presenceDot"></span>
           <span id="presenceText">In attesa di presenza…</span>
         </div>
 
-        <!-- DEBUG: mostra motion + stato camera -->
-        <div class="presence-pill" style="top:44px" id="debugPill" aria-live="polite">
-          <span id="debugText">motion: --- · camera: avvio…</span>
+        <div class="pill" style="top:44px" aria-live="polite">
+          <span id="debugText">init…</span>
         </div>
 
         <div class="hint-mobile" id="hintMobile">
@@ -166,52 +149,30 @@
           Al primo avvio potrebbe essere necessario <strong>toccare lo schermo</strong> per abilitare il microfono.
         </div>
 
-        <!-- elementi per presence detection -->
         <video id="presence-video" playsinline muted></video>
         <canvas id="presence-canvas"></canvas>
       </div>
     </div>
 
     <script>
-      (function(window){
+      (function(){
         const host="https://labs.heygen.com";
         const url=host+"/guest/streaming-embed?share=eyJxdWFsaXR5IjoiaGlnaCIsImF2YXRhck5hbWUiOiJLYXR5YV9Qcm9mZXNzaW9uYWxMb29rX3B1%0D%0AYmxpYyIsInByZXZpZXdJbWciOiJodHRwczovL2ZpbGVzMi5oZXlnZW4uYWkvYXZhdGFyL3YzLzM0%0D%0AOGRkZjUwM2M2NTRiOWJiYmI4YmVhOWY5MjEwZWFkXzU1ODcwL3ByZXZpZXdfdGFyZ2V0LndlYnAi%0D%0ALCJuZWVkUmVtb3ZlQmFja2dyb3VuZCI6dHJ1ZSwia25vd2xlZGdlQmFzZUlkIjoiY2E3M2VmNmY2%0D%0AOTdhNGFhMTgzZGM1MzZkY2EyMDY3YmYiLCJ1c2VybmFtZSI6ImZiNDBjZGI1NjdlZjRjMTg5MDM4%0D%0ANDkwODI5YzIwZTZmIn0%3D&inIFrame=1";
 
-        const frame=document.getElementById("frame");
+        const frame = document.getElementById("frame");
 
-        // Wrapper embed
+        // Embed wrapper
         const wrapDiv=document.createElement("div");
         wrapDiv.id="heygen-streaming-embed";
-
         const container=document.createElement("div");
         container.id="heygen-streaming-container";
-
-        const stylesheet=document.createElement("style");
-        stylesheet.innerHTML=`
-          #heygen-streaming-embed {
-            z-index: 40;
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            border-radius: 0;
-            border: 0;
-            overflow: hidden;
-            transition: opacity .25s ease-out;
-          }
-          #heygen-streaming-container { width: 100%; height: 100%; }
-          #heygen-streaming-container iframe { width: 100%; height: 100%; border: 0; }
-        `;
-
         const iframe=document.createElement("iframe");
         iframe.allowFullscreen=false;
         iframe.title="La Sciampista AI";
         iframe.role="dialog";
         iframe.allow="microphone; camera; autoplay";
         iframe.src=url;
-
         container.appendChild(iframe);
-        wrapDiv.appendChild(stylesheet);
         wrapDiv.appendChild(container);
         frame.appendChild(wrapDiv);
 
@@ -224,20 +185,6 @@
         const presenceText = document.getElementById("presenceText");
         const hintMobile = document.getElementById("hintMobile");
         const debugText = document.getElementById("debugText");
-
-        let lastImageData = null;
-        let lastPresenceTs = 0;
-        let presenceActive = false;
-        let consecutiveHits = 0;
-
-        // ===== PARAMETRI ULTRA-SENSIBILI (MODIFICHE) =====
-        const SAMPLE_W = 240;        // prima 160
-        const SAMPLE_H = 180;        // prima 120
-
-        const DIFF_THRESHOLD = 6;    // prima 10 (più sensibile)
-        const MOTION_RATIO   = 0.0035; // prima 0.012 (trigger anche con motion bassissima)
-        const REQUIRED_HITS  = 2;    // prima 3
-        const COOLDOWN_MS    = 5000; // ok
 
         function setPresenceUI(on){
           presenceDot.classList.toggle("on", on);
@@ -252,123 +199,234 @@
         function activateHeyGen(){
           showHeyGen();
 
-          // Tentativo postMessage (se supportato dall’embed)
+          // Tentativi (solo se supportati dall’embed)
           try {
             iframe.contentWindow.postMessage({ type: "streaming-embed", action: "show" }, host);
             iframe.contentWindow.postMessage({ type: "streaming-embed", action: "start" }, host);
             iframe.contentWindow.postMessage({ type: "streaming-embed", action: "open" }, host);
           } catch(_) {}
 
-          // Tentativo click sintetico sull’iframe (non sempre accettato)
+          // click sintetico (non sempre accettato)
           try {
             iframe.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
           } catch(_) {}
         }
 
-        // Fallback perfetto per microfono: tap/click manuale
-        frame.addEventListener("click", () => {
-          showHeyGen();
-        }, { passive: true });
+        // Tap manuale = sblocca sempre
+        frame.addEventListener("click", () => showHeyGen(), { passive: true });
+
+        // ===============================
+        // FACE DETECTION "PRESENCE LOCK"
+        // ===============================
+        const faceSupported = ("FaceDetector" in window);
+        let faceDetector = null;
+
+        // Lock management
+        let isLocked = false;
+        let lockUntilTs = 0;
+        let lastFaceSeenTs = 0;
+        let faceConsecutiveHits = 0;
+
+        const FACE_SCAN_EVERY_MS = 350;   // ogni quanto controllare volti
+        const FACE_REQUIRED_HITS = 2;     // 2 hit consecutivi = presence
+        const FACE_GRACE_MS = 2500;       // se perde volto, mantiene lock per 2.5s
+        const LOCK_MIN_MS = 12000;        // una volta attivato, resta "attivo" almeno 12s
+
+        // ===============================
+        // MOTION fallback (se FaceDetector manca)
+        // ===============================
+        let lastImageData = null;
+        let motionConsecutiveHits = 0;
+        let lastMotionTs = 0;
+
+        // motion params (sensibili)
+        const SAMPLE_W = 240;
+        const SAMPLE_H = 180;
+        const DIFF_THRESHOLD = 6;
+        const MOTION_RATIO   = 0.0035;
+        const MOTION_REQUIRED_HITS = 2;
+        const MOTION_COOLDOWN_MS = 5000;
+
+        function lockPresence(reason){
+          const now = Date.now();
+          isLocked = true;
+          lastFaceSeenTs = now;
+          lockUntilTs = Math.max(lockUntilTs, now + LOCK_MIN_MS);
+          setPresenceUI(true);
+          activateHeyGen();
+          if (debugText) debugText.textContent = `LOCK ✅ (${reason})`;
+        }
+
+        function maybeUnlock(){
+          const now = Date.now();
+          const graceOk = (now - lastFaceSeenTs) <= FACE_GRACE_MS;
+          const minLockOk = now <= lockUntilTs;
+
+          if (minLockOk || graceOk) return; // resta lock
+
+          isLocked = false;
+          faceConsecutiveHits = 0;
+          setPresenceUI(false);
+          if (debugText) debugText.textContent = faceSupported ? "Face: idle" : "Motion: idle";
+        }
 
         async function startCamera(){
           try {
-            if (debugText) debugText.textContent = "motion: --- · camera: richiesta permesso…";
+            if (debugText) debugText.textContent = "camera: richiesta permesso…";
 
             const stream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                facingMode: "user",
-                width: { ideal: 640 },
-                height: { ideal: 480 }
-              },
+              video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
               audio: false
             });
 
             videoEl.srcObject = stream;
             await videoEl.play();
 
-            // IMPORTANT: canvas deve seguire le nuove dimensioni
             canvasEl.width = SAMPLE_W;
             canvasEl.height = SAMPLE_H;
 
-            if (debugText) debugText.textContent = "motion: --- · camera: OK";
+            // setup face detector
+            if (faceSupported) {
+              faceDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+              if (debugText) debugText.textContent = "FaceDetector: ON";
+            } else {
+              if (debugText) debugText.textContent = "FaceDetector: OFF (fallback motion)";
+            }
 
-            // Fallback: se non rileva entro 8s, mostra comunque
+            // fallback: se dopo 8s non si attiva nulla, mostra embed comunque
             setTimeout(() => {
               if (!wrapDiv.classList.contains("show")) {
                 presenceText.textContent = "Presenza non rilevata · Avvio manuale";
-                if (debugText) debugText.textContent = "motion: --- · camera: OK (fallback)";
+                if (debugText) debugText.textContent = "fallback: show embed";
                 showHeyGen();
               }
             }, 8000);
 
-            requestAnimationFrame(loop);
+            // avvia loop combinato
+            tick();
 
           } catch (err) {
             setPresenceUI(false);
             presenceText.textContent = "Camera non disponibile · Tocca per avviare";
-            if (debugText) debugText.textContent = "motion: --- · camera: ERRORE/NEGATA";
+            if (debugText) debugText.textContent = "camera: ERRORE/NEGATA";
             showHeyGen();
           }
         }
 
-        function loop(){
-          if (debugText && videoEl.readyState < 2) {
-            debugText.textContent = "motion: --- · camera: attesa frame…";
-          }
+        let lastFaceScanTs = 0;
 
-          if (videoEl.readyState >= 2) {
-            ctx.drawImage(videoEl, 0, 0, SAMPLE_W, SAMPLE_H);
-            const imageData = ctx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
+        async function tick(){
+          const now = Date.now();
 
-            if (lastImageData) {
-              let changed = 0;
-              const data = imageData.data;
-              const last = lastImageData.data;
-
-              // ===== campionamento più fitto (MODIFICA): i += 4 invece di 8 =====
-              for (let i = 0; i < data.length; i += 4) {
-                const r = data[i], g = data[i+1], b = data[i+2];
-                const lr = last[i], lg = last[i+1], lb = last[i+2];
-                const diff = (Math.abs(r-lr) + Math.abs(g-lg) + Math.abs(b-lb)) / 3;
-                if (diff > DIFF_THRESHOLD) changed++;
-              }
-
-              const totalSamples = (data.length / 4);
-              const ratio = changed / totalSamples;
-
-              if (debugText) debugText.textContent = `motion: ${ratio.toFixed(4)} · camera: OK`;
-
-              const now = Date.now();
-              const inCooldown = (now - lastPresenceTs) < COOLDOWN_MS;
-
-              if (!inCooldown && ratio > MOTION_RATIO) {
-                consecutiveHits++;
-              } else {
-                consecutiveHits = Math.max(0, consecutiveHits - 1);
-              }
-
-              if (!presenceActive && !inCooldown && consecutiveHits >= REQUIRED_HITS) {
-                presenceActive = true;
-                lastPresenceTs = now;
-                setPresenceUI(true);
-                activateHeyGen();
-
-                setTimeout(() => {
-                  presenceActive = false;
-                  setPresenceUI(false);
-                  // l’avatar resta visibile
-                }, 2500);
-              }
+          // se già in lock, proviamo a mantenere/aggiornare “last seen”
+          // e decidere eventuale unlock
+          if (isLocked) {
+            // Se FaceDetector disponibile, aggiorniamo lastFaceSeenTs quando vede un volto.
+            // In caso contrario useremo il motion per tenere vivo lastFaceSeenTs.
+            if (faceSupported && faceDetector && (now - lastFaceScanTs) >= FACE_SCAN_EVERY_MS) {
+              lastFaceScanTs = now;
+              const saw = await detectFaceOnce();
+              if (saw) lastFaceSeenTs = now;
+            } else if (!faceSupported) {
+              const mot = detectMotionOnce();
+              if (mot) lastFaceSeenTs = now;
             }
 
-            lastImageData = imageData;
+            maybeUnlock();
+            requestAnimationFrame(tick);
+            return;
           }
 
-          requestAnimationFrame(loop);
+          // NON locked: cerchiamo presenza
+          if (faceSupported && faceDetector) {
+            if ((now - lastFaceScanTs) >= FACE_SCAN_EVERY_MS) {
+              lastFaceScanTs = now;
+              const saw = await detectFaceOnce();
+
+              if (saw) {
+                faceConsecutiveHits++;
+                if (debugText) debugText.textContent = `Face: ✅ (${faceConsecutiveHits}/${FACE_REQUIRED_HITS})`;
+                if (faceConsecutiveHits >= FACE_REQUIRED_HITS) lockPresence("face");
+              } else {
+                faceConsecutiveHits = Math.max(0, faceConsecutiveHits - 1);
+                if (debugText) debugText.textContent = `Face: -- (${faceConsecutiveHits}/${FACE_REQUIRED_HITS})`;
+              }
+            }
+          } else {
+            // fallback motion
+            const mot = detectMotionOnce();
+            if (mot) {
+              motionConsecutiveHits++;
+            } else {
+              motionConsecutiveHits = Math.max(0, motionConsecutiveHits - 1);
+            }
+
+            if (debugText) debugText.textContent =
+              `Motion: ${mot ? "✅" : "--"} (${motionConsecutiveHits}/${MOTION_REQUIRED_HITS})`;
+
+            if (motionConsecutiveHits >= MOTION_REQUIRED_HITS) {
+              // cooldown motion
+              if ((now - lastMotionTs) > MOTION_COOLDOWN_MS) {
+                lastMotionTs = now;
+                lockPresence("motion");
+              }
+            }
+          }
+
+          requestAnimationFrame(tick);
+        }
+
+        async function detectFaceOnce(){
+          try {
+            // creiamo un ImageBitmap dal video (molto leggero)
+            const bmp = await createImageBitmap(videoEl);
+            const faces = await faceDetector.detect(bmp);
+            bmp.close?.();
+
+            const saw = (faces && faces.length > 0);
+            return saw;
+          } catch (e) {
+            // se FaceDetector fallisce (policy/bug), passiamo al fallback motion
+            if (debugText) debugText.textContent = "FaceDetector errore → fallback motion";
+            faceDetector = null;
+            return false;
+          }
+        }
+
+        function detectMotionOnce(){
+          if (videoEl.readyState < 2) return false;
+
+          ctx.drawImage(videoEl, 0, 0, SAMPLE_W, SAMPLE_H);
+          const imageData = ctx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
+
+          if (!lastImageData) {
+            lastImageData = imageData;
+            return false;
+          }
+
+          let changed = 0;
+          const data = imageData.data;
+          const last = lastImageData.data;
+
+          // campionamento fitto
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i+1], b = data[i+2];
+            const lr = last[i], lg = last[i+1], lb = last[i+2];
+            const diff = (Math.abs(r-lr) + Math.abs(g-lg) + Math.abs(b-lb)) / 3;
+            if (diff > DIFF_THRESHOLD) changed++;
+          }
+
+          const totalSamples = (data.length / 4);
+          const ratio = changed / totalSamples;
+
+          lastImageData = imageData;
+
+          // utile anche in debug quando siamo in fallback
+          return ratio > MOTION_RATIO;
         }
 
         window.addEventListener("load", startCamera);
-      })(globalThis);
+      })();
     </script>
   </body>
 </html>
