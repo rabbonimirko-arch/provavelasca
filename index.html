@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <title>La Sciampista · Assistente AI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html,body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        background: #f7efe9;
+        color: #1f1f1f;
+        font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      header {
+        padding: 10px 14px;
+        font-size: .8rem;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        color: #6a5b54;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(255,255,255,0.6);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        z-index: 1000;
+      }
+
+      header .brand {
+        color: #b47a72;
+        font-weight: 600;
+      }
+
+      .app-wrapper {
+        position: relative;
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+      }
+
+      .frame-9-16 {
+        position: relative;
+        width: 100vw;
+        max-width: 540px;
+        aspect-ratio: 9/16;
+        border-radius: 0;
+        overflow: hidden;
+        background: #000;
+      }
+
+      #heygen-streaming-embed {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none; /* finché non c'è presenza */
+      }
+
+      #heygen-streaming-embed.show {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transition: opacity .3s ease-out;
+      }
+
+      #heygen-streaming-container,
+      #heygen-streaming-container iframe {
+        width: 100% !important;
+        height: 100% !important;
+        border: 0 !important;
+      }
+
+      .hint-mobile {
+        position: absolute;
+        bottom: 10px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: .75rem;
+        color: #fff;
+        background: rgba(0,0,0,0.35);
+        padding: 8px 10px;
+        border-radius: 12px;
+        margin: 0 10px;
+        z-index: 50;
+      }
+
+      .hint-mobile strong { font-weight: 700; }
+
+      .presence-pill {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 60;
+        font-size: .75rem;
+        color: #fff;
+        background: rgba(0,0,0,0.35);
+        padding: 6px 10px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #888;
+        box-shadow: 0 0 0 2px rgba(255,255,255,0.12) inset;
+      }
+      .dot.on { background: #46d369; }
+
+      /* camera (nascosta) */
+      #presence-video, #presence-canvas {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+        left: -9999px;
+        top: -9999px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <div class="brand">La Sciampista · AI</div>
+      <div class="hint">Consulente capelli naturale</div>
+    </header>
+
+    <div class="app-wrapper">
+      <div class="frame-9-16">
+        <div class="presence-pill" id="presencePill" aria-live="polite">
+          <span class="dot" id="presenceDot"></span>
+          <span id="presenceText">In attesa di presenza…</span>
+        </div>
+
+        <div class="hint-mobile" id="hintMobile">
+          <strong>Avvicinati</strong> e l’avatar si attiva automaticamente.<br/>
+          Al primo avvio potrebbe essere necessario <strong>toccare lo schermo</strong> per abilitare il microfono.
+        </div>
+
+        <!-- elementi per presence detection -->
+        <video id="presence-video" playsinline muted></video>
+        <canvas id="presence-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Script HeyGen a tutto schermo -->
+    <script>
+      (function(window){
+        const host="https://labs.heygen.com";
+        const url=host+"/guest/streaming-embed?share=eyJxdWFsaXR5IjoiaGlnaCIsImF2YXRhck5hbWUiOiJLYXR5YV9Qcm9mZXNzaW9uYWxMb29rX3B1%0D%0AYmxpYyIsInByZXZpZXdJbWciOiJodHRwczovL2ZpbGVzMi5oZXlnZW4uYWkvYXZhdGFyL3YzLzM0%0D%0AOGRkZjUwM2M2NTRiOWJiYmI4YmVhOWY5MjEwZWFkXzU1ODcwL3ByZXZpZXdfdGFyZ2V0LndlYnAi%0D%0ALCJuZWVkUmVtb3ZlQmFja2dyb3VuZCI6dHJ1ZSwia25vd2xlZGdlQmFzZUlkIjoiY2E3M2VmNmY2%0D%0AOTdhNGFhMTgzZGM1MzZkY2EyMDY3YmYiLCJ1c2VybmFtZSI6ImZiNDBjZGI1NjdlZjRjMTg5MDM4%0D%0ANDkwODI5YzIwZTZmIn0%3D&inIFrame=1";
+
+        const wrapDiv=document.createElement("div");
+        wrapDiv.id="heygen-streaming-embed";
+
+        const container=document.createElement("div");
+        container.id="heygen-streaming-container";
+
+        const stylesheet=document.createElement("style");
+        stylesheet.innerHTML=`
+          #heygen-streaming-embed {
+            z-index: 40;
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 0;
+            border: 0;
+            overflow: hidden;
+            transition: opacity .25s ease-out;
+          }
+          #heygen-streaming-container {
+            width: 100%;
+            height: 100%;
+          }
+          #heygen-streaming-container iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+          }
+        `;
+
+        const iframe=document.createElement("iframe");
+        iframe.allowFullscreen=false;
+        iframe.title="La Sciampista AI";
+        iframe.role="dialog";
+        iframe.allow="microphone; camera; autoplay";
+        iframe.src=url;
+
+        let initial=false;
+        window.addEventListener("message",(e=>{
+          if(e.origin!==host) return;
+          if(!e.data || e.data.type!=="streaming-embed") return;
+
+          if(e.data.action==="init"){
+            initial=true;
+            // non mostro subito: lo gestiamo noi con la presenza
+          }
+        }));
+
+        container.appendChild(iframe);
+        wrapDiv.appendChild(stylesheet);
+        wrapDiv.appendChild(container);
+
+        const frame=document.querySelector('.frame-9-16');
+        if(frame){ frame.appendChild(wrapDiv); }
+
+        // ===== Presence detection (motion) =====
+        const videoEl = document.getElementById("presence-video");
+        const canvasEl = document.getElementById("presence-canvas");
+        const ctx = canvasEl.getContext("2d", { willReadFrequently: true });
+
+        const presenceDot = document.getElementById("presenceDot");
+        const presenceText = document.getElementById("presenceText");
+        const hintMobile = document.getElementById("hintMobile");
+
+        let lastImageData = null;
+        let lastPresenceTs = 0;
+        let presenceActive = false;
+        let consecutiveHits = 0;
+
+        // parametri (tarabili)
+        const SAMPLE_W = 160;
+        const SAMPLE_H = 120;
+        const DIFF_THRESHOLD = 18;       // sensibilità pixel (0-255)
+        const MOTION_RATIO = 0.035;      // % pixel in movimento per "presenza"
+        const REQUIRED_HITS = 6;         // frame consecutivi per confermare presenza
+        const COOLDOWN_MS = 12000;       // dopo attivazione, non "rimbalza" per 12s
+
+        function setPresenceUI(on){
+          presenceDot.classList.toggle("on", on);
+          presenceText.textContent = on ? "Presenza rilevata · Attivo chat…" : "In attesa di presenza…";
+        }
+
+        function activateHeyGen(){
+          wrapDiv.classList.add("show");
+          hintMobile.style.display = "none";
+
+          // Tentativo 1: postMessage (funziona solo se HeyGen lo supporta)
+          try {
+            iframe.contentWindow.postMessage(
+              { type: "streaming-embed", action: "show" },
+              host
+            );
+            // alcuni embed usano nomi diversi: proviamo anche "start"
+            iframe.contentWindow.postMessage(
+              { type: "streaming-embed", action: "start" },
+              host
+            );
+            iframe.contentWindow.postMessage(
+              { type: "streaming-embed", action: "open" },
+              host
+            );
+          } catch(_) {}
+
+          // Tentativo 2: “tap” sintetico sull’iframe (non sempre accettato dal browser)
+          try {
+            const ev = new MouseEvent("click", { bubbles: true, cancelable: true, view: window });
+            iframe.dispatchEvent(ev);
+          } catch(_) {}
+        }
+
+        function deactivateHintIfNeeded(){
+          // se l’utente tocca manualmente, mostriamo comunque l’avatar
+          wrapDiv.classList.add("show");
+          hintMobile.style.display = "none";
+        }
+
+        // click/tap manuale: fallback perfetto per microfono
+        frame.addEventListener("click", deactivateHintIfNeeded, { passive: true });
+
+        async function startCamera(){
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: "user",
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+              },
+              audio: false
+            });
+            videoEl.srcObject = stream;
+            await videoEl.play();
+
+            canvasEl.width = SAMPLE_W;
+            canvasEl.height = SAMPLE_H;
+
+            requestAnimationFrame(loop);
+          } catch (err) {
+            // Se la camera non è disponibile o negata, lasciamo solo l’attivazione manuale
+            setPresenceUI(false);
+            presenceText.textContent = "Camera non disponibile · Tocca per avviare";
+            wrapDiv.classList.add("show");
+            // non nascondo hint: serve per guidare l’utente
+          }
+        }
+
+        function loop(){
+          if(videoEl.readyState >= 2){
+            ctx.drawImage(videoEl, 0, 0, SAMPLE_W, SAMPLE_H);
+            const imageData = ctx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
+
+            if(lastImageData){
+              let changed = 0;
+              const data = imageData.data;
+              const last = lastImageData.data;
+
+              // confronto veloce: campiono un pixel ogni 2 (veloce + stabile)
+              for(let i=0; i<data.length; i+=8){
+                const r = data[i], g = data[i+1], b = data[i+2];
+                const lr = last[i], lg = last[i+1], lb = last[i+2];
+
+                const diff = (Math.abs(r-lr) + Math.abs(g-lg) + Math.abs(b-lb)) / 3;
+                if(diff > DIFF_THRESHOLD) changed++;
+              }
+
+              const totalSamples = (data.length / 8);
+              const ratio = changed / totalSamples;
+
+              const now = Date.now();
+              const inCooldown = (now - lastPresenceTs) < COOLDOWN_MS;
+
+              if(!inCooldown && ratio > MOTION_RATIO){
+                consecutiveHits++;
+              } else {
+                consecutiveHits = Math.max(0, consecutiveHits - 1);
+              }
+
+              if(!presenceActive && !inCooldown && consecutiveHits >= REQUIRED_HITS){
+                presenceActive = true;
+                lastPresenceTs = now;
+                setPresenceUI(true);
+                activateHeyGen();
+
+                // dopo un po’ rimettiamo la UI in ascolto “soft”
+                setTimeout(()=>{
+                  presenceActive = false;
+                  setPresenceUI(false);
+                  // non nascondo l’avatar: una volta attivo lo lasciamo attivo
+                }, 4000);
+              }
+            }
+
+            lastImageData = imageData;
+          }
+
+          requestAnimationFrame(loop);
+        }
+
+        // Avvia camera al load
+        window.addEventListener("load", startCamera);
+
+      })(globalThis);
+    </script>
+  </body>
+</html>
